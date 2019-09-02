@@ -148,6 +148,7 @@ models.post('/models', (req, res, next) => {
             console.log('----------------------------------------------------------------------------------------------');
 
             let output = solc.compile({ sources: input }, 1);
+            console.log(output);
             if (Object.keys(output.contracts).length === 0) {
                 res.status(400).send('COMPILATION ERROR IN SMART CONTRACTS');
                 console.log('COMPILATION ERROR IN SMART CONTRACTS');
