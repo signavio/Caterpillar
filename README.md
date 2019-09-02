@@ -19,6 +19,22 @@ Caterpillar’s code distribution in this repository contains three different fo
 
 For running Caterpillar locally, download the source code from the repository and follow the next steps to set up the applications and install the required dependencies. For running caterpillar from a Docker image go directly to the last section of this document. Be aware that the Docker image works only on the version v1.0.
 
+## Setting the local blockchain network.
+
+You can choose to deploy in either the Ethereum framework or Hyperledger Fabric framework. So based on the network of your choice set up the network using the following steps.
+
+## Setting the Ethereum network
+
+### Installing Ganache CLI
+
+By default, the core of Caterpillar was configured to run on top of Ganache CLI which is a Node.js based Ethereum client for testing and development. It uses ethereumjs to simulate full client behavior and make developing Ethereum applications. All the instructions about the installation can be found here: https://github.com/trufflesuite/ganache-cli/. However, the Ethereum Provider can be updated at the beginning of the source code in the controller "caterpillar-core/src/models/models.controller.ts" (check the comments).
+
+Note that Ganache CLI is written in Javascript and distributed as a Node package via npm. Make sure you have Node.js (>= v6.11.5) installed. Besides, be aware to start the Ganache CLI server before running the applications Caterpillar Core and Services Manager. In that respect, you only need to open a terminal on your computer and run the command:
+
+     ganache-cli
+
+
+
 ## Setting the hyperledger network
 
 In this step, we will setup fabric locally using docker containers, install the EVM chaincode (EVMCC) and instantiate the EVMCC on our fabric peers. This step uses the hyperledger [fabric-sample](https://github.com/hyperledger/fabric-samples) repo to deploy fabric locally and the [fabric-chaincode-evm](https://github.com/hyperledger/fabric-chaincode-evm) repo for the EVMCC, Fab3 and Fab3.  This step follows the [fabric-chaincode-evm tutorial](https://github.com/hyperledger/fabric-chaincode-evm/blob/master/examples/EVM_Smart_Contracts.md) closely.
@@ -274,6 +290,8 @@ Open a web browser and put the URL http://localhost:4200/.
 You must use the button refresh to update the instances running, and then select one of the URLs obtained that will contain the address when it is running the smart contract. Then press the button __Open__. Here, you can see the enabled activities visualized in dark green. For executing any enabled activity, just click on it and fill the parameter info if required. All the execution of the process (including internal operations) can be traced from the terminal of __caterpillar_core__.
 
 ## Deploying the smart contract into hyperledger fabric
+
+The below steps are only for deploying to the hyperledger framework.
 
 Next, we'll install the web3 dependency and use this library to deploy the smart contract.
 
