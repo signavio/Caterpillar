@@ -19,13 +19,165 @@ Caterpillar’s code distribution in this repository contains three different fo
 
 For running Caterpillar locally, download the source code from the repository and follow the next steps to set up the applications and install the required dependencies. For running caterpillar from a Docker image go directly to the last section of this document. Be aware that the Docker image works only on the version v1.0.
 
-## Installing Ganache CLI
+## Setting the local blockchain network.
+
+You can choose to deploy in either the Ethereum framework or Hyperledger Fabric framework. So based on the network of your choice set up the network using the following steps.
+
+## Setting the Ethereum network
+
+### Installing Ganache CLI
 
 By default, the core of Caterpillar was configured to run on top of Ganache CLI which is a Node.js based Ethereum client for testing and development. It uses ethereumjs to simulate full client behavior and make developing Ethereum applications. All the instructions about the installation can be found here: https://github.com/trufflesuite/ganache-cli/. However, the Ethereum Provider can be updated at the beginning of the source code in the controller "caterpillar-core/src/models/models.controller.ts" (check the comments).
 
 Note that Ganache CLI is written in Javascript and distributed as a Node package via npm. Make sure you have Node.js (>= v6.11.5) installed. Besides, be aware to start the Ganache CLI server before running the applications Caterpillar Core and Services Manager. In that respect, you only need to open a terminal on your computer and run the command:
 
      ganache-cli
+
+
+
+## Setting the hyperledger network
+
+In this step, we will setup fabric locally using docker containers, install the EVM chaincode (EVMCC) and instantiate the EVMCC on our fabric peers. This step uses the hyperledger [fabric-sample](https://github.com/hyperledger/fabric-samples) repo to deploy fabric locally and the [fabric-chaincode-evm](https://github.com/hyperledger/fabric-chaincode-evm) repo for the EVMCC, Fab3 and Fab3.  This step follows the [fabric-chaincode-evm tutorial](https://github.com/hyperledger/fabric-chaincode-evm/blob/master/examples/EVM_Smart_Contracts.md) closely.
+
+### Clean docker and set GOPATH
+
+This will remove all your docker containers and images!
+```
+docker stop $(docker ps -a -q)
+docker rm $(docker ps -a -q)
+docker rmi $(docker images -q) -f
+```
+
+Make sure to set GOPATH to your go installation
+```
+export GOPATH=$HOME/go
+```
+
+### Get Fabric Samples and download Fabric images
+
+Clone the [fabric-samples](https://github.com/hyperledger/fabric-samples) repo in your `GOPATH/src/github.com/hyperledger` directory:
+```
+cd $GOPATH/src/github.com/hyperledger/
+git clone https://github.com/hyperledger/fabric-samples.git
+```
+
+Checkout `release-1.4`
+```
+cd fabric-samples
+git checkout release-1.4
+```
+
+Download the docker images
+```
+./scripts/bootstrap.sh
+```
+
+### Mount the EVM Chaincode and start the network
+
+Clone the `fabric-chaincode-evm` repo in your GOPATH directory.
+```
+cd $GOPATH/src/github.com/hyperledger/
+git clone https://github.com/hyperledger/fabric-chaincode-evm
+```
+
+Checkout `release-0.1`
+```
+cd fabric-chaincode-evm
+git checkout release-0.1
+```
+
+
+Now navigate back to your fabric-samples folder.  Here we will use first-network to launch the network.
+```
+cd $GOPATH/src/github.com/hyperledger/fabric-samples/first-network
+```
+
+Update the `docker-compose-cli.yaml` with the volumes to include the fabric-chaincode-evm.
+
+```
+  cli:
+    volumes:
+      - ./../../fabric-chaincode-evm:/opt/gopath/src/github.com/hyperledger/fabric-chaincode-evm
+```
+
+Generate certificates and bring up the network
+```
+./byfn.sh generate
+./byfn.sh up
+```
+
+### Install and Instantiate EVM Chaincode
+
+Navigate into the cli docker container
+```
+docker exec -it cli bash
+```
+
+If successful, you should see the following prompt
+```
+root@0d78bb69300d:/opt/gopath/src/github.com/hyperledger/fabric/peer#
+```
+
+To change which peer is targeted change the following environment variables:
+```
+export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+export CORE_PEER_ADDRESS=peer0.org1.example.com:7051
+export CORE_PEER_LOCALMSPID="Org1MSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+```
+
+Next install the EVM chaincode on all the peers
+```
+peer chaincode install -n evmcc -l golang -v 0 -p github.com/hyperledger/fabric-chaincode-evm/evmcc
+```
+
+Instantiate the chaincode:
+
+```
+peer chaincode instantiate -n evmcc -v 0 -C mychannel -c '{"Args":[]}' -o orderer.example.com:7050 --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+```
+
+Great.  You can exit out of the cli container and return to your terminal.
+```
+exit
+```
+
+You are now ready to setup Fab3.
+
+
+### Setup Fab3
+
+
+Execute the following to set certain environment variables required for setting up Fab3.
+
+```
+export FABPROXY_CONFIG=${GOPATH}/src/github.com/hyperledger/fabric-chaincode-evm/examples/first-network-sdk-config.yaml # Path to a compatible Fabric SDK Go config file
+export FABPROXY_USER=User1 # User identity being used for the proxy (Matches the users names in the crypto-config directory specified in the config)
+export FABPROXY_ORG=Org1  # Organization of the specified user
+export FABPROXY_CHANNEL=mychannel # Channel to be used for the transactions
+export FABPROXY_CCID=evmcc # ID of the EVM Chaincode deployed in your fabric network
+export PORT=8545 # Port the proxy will listen on. If not provided default is 8545.
+```
+
+Navigate to the `fabric-chaincode-evm` cloned repo:
+```
+cd $GOPATH/src/github.com/hyperledger/fabric-chaincode-evm/
+```
+Run the following to build the fab proxy
+```
+go build -o fab3 ./fabproxy/cmd
+```
+You can then run the proxy:
+```
+./fab3
+```
+
+This will start Fab3 at `http://localhost:8545`
+
+You should see output like the following:
+```
+{"level":"info","ts":1550530404.3546276,"logger":"fab3","caller":"cmd/main.go:143","msg":"Starting Fab3","port":8545}
+```
 
 ## How to use Caterpillar Core
 
@@ -47,7 +199,7 @@ For running the application you may use one of the following commands
 
 By default the application runs on http://localhost:3000.
 
-> Make sure you have Ganache Cli running in your computer before starting the core. Besides, if you are using the version v2.0 a MongoDB client must be also running.
+> Make sure you have fabric running in your computer before starting the core. Besides, if you are using the version v2.0 a MongoDB client must be also running.
 
 The application provides a REST API to interact with the core of Caterpillar. The following table summarizes the mapping of resource-related actions:
 
@@ -137,26 +289,60 @@ Open a web browser and put the URL http://localhost:4200/.
 
 You must use the button refresh to update the instances running, and then select one of the URLs obtained that will contain the address when it is running the smart contract. Then press the button __Open__. Here, you can see the enabled activities visualized in dark green. For executing any enabled activity, just click on it and fill the parameter info if required. All the execution of the process (including internal operations) can be traced from the terminal of __caterpillar_core__.
 
+## Deploying the smart contract into hyperledger fabric
 
-## Running Caterpillar from a Docker Image (ONLY FOR v1.0)
+The below steps are only for deploying to the hyperledger framework.
 
-It is also possible to execute Caterpillar from a Docked Image without needing to install all the dependencies required to run the applications locally. For that, it is necessary only to install Docker (https://www.docker.com/) on your computer, then open a terminal and run the comand:
+Next, we'll install the web3 dependency and use this library to deploy the smart contract.
 
-     docker run --rm -it -p 3200:3200 -p 3000:3000 -p 8090:8090 orlenyslp/caterpillar-demo:v1
+To install the same version of `web3` open a new terminal and run:
+```npm install web3@0.20.2 ```
 
-Initially, you will see in the terminal, the creation of two services that are necesary for running the running example provided in https://github.com/orlenyslp/Caterpillar/blob/master/caterpillar-core/demo_running_example.bpmn. When the terminal displays the message "Listening on port 3000", it means that the core is running and then open a web browser to interact with execution panel that will be running in the URL http://localhost:3200/.
+Now we'll enter node console to set up our web3.
 
-The execution panel provides a simple interface to interact with the core. The following options are available:
+```node```
 
- + Creating and uploading bpmn models by clicking the button with the corresponding name. From the modeler, when you press save, the request is sent to the core. The information about the creation, compilation, and deploy of the smart contracts will be displayed in the terminal where the Docker container is running. If the model was successfully compiled, then a link to display its information will appear on the dashboard with the format <model_identifier>:<model_name>.
- 
- > After upload the running example, it is necessary to go to the documentation section for both service tasks and to replace the strings labeled as $Assess_Loan_Risk_Address and $Appraise Property_Address with the corresponding addresses where the services are running. These addresses were displayed in the terminal when the Docker container starts running.
- 
-+ Searching and displaying all the process model created in the current running of the container. The search will retrieve every model whose name or identifier contains the input as a substring. Empty searches will generate all the models created until now.
- 
- + Displaying the solidity code generated from the process model and create new instances. From the dashboard, click the link to display the information of the desired process model. Here, there are accessible the solidity code and the active instances. There are also provided two buttons that allow the creation and updating of running instances. The button labeled with "Refresh instances" will remove from the list all the addresses to processes instances whose execution was concluded.
- 
- + Executing process instances. By clicking on the address of the desired instance, it will be displayed a viewer that allows the visualization of the active tasks (in dark green) that can be executed by clicking on them. The viewer also allows switching to each active instance of the process. Every time a new instance is selected, the button labeled with "Go" must be pressed to display the current status of the instance.
- 
-All the results of the queries performed by the execution panel to the caterpillar core through the REST API will appear also in the terminal where the docker container is running.  
- 
+Assign Web3 library and use the fab3 running in the previous terminal as provider.
+```
+Web3 = require('web3')
+web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'))
+```
+Check to see your account information
+```
+web3.eth.accounts
+```
+You should see something like this which is similar to an Ethereum account:
+  ```
+  [ '0x2c045d4565e31cef1f6cd7368c3436a79f1cea4f' ]
+  ```
+Assign this account as defaultAccount
+```
+web3.eth.defaultAccount = web3.eth.accounts[0]
+```
+
+* The terminal which has the caterpillar core opened returns the byteCode value and the interface value which is the ABI. Assign the interface value to ABI.
+
+``` ABI = interface ```
+* Next assign the long evm complied byte code:  
+
+ByteCode = `608060405234801561001057600080fd5b506..........9899`
+
+
+Assign contract with web3 using the contract's ABI.
+```
+Contract = web3.eth.contract(ABI)
+```
+
+Next, deploy the contract using the contract byte code.
+```
+deployedContract = Contract.new([], { data: ByteCode })
+```
+
+You can get the contract address by using the transaction hash of the deployed contract.
+```
+web3.eth.getTransactionReceipt(deployedContract.transactionHash)
+```
+
+The smart contract is deployed to the hyperledger network.
+
+
