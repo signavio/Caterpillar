@@ -148,7 +148,6 @@ models.post('/models', (req, res, next) => {
             console.log('----------------------------------------------------------------------------------------------');
 
             let output = solc.compile({ sources: input }, 1);
-            console.log(output);
             if (Object.keys(output.contracts).length === 0) {
                 res.status(400).send('COMPILATION ERROR IN SMART CONTRACTS');
                 console.log('COMPILATION ERROR IN SMART CONTRACTS');
@@ -161,6 +160,12 @@ models.post('/models', (req, res, next) => {
                 console.log(key);
             })
             modelInfo.contracts = output.contracts;
+
+            const bytecode = output.contracts[modelInfo.entryContractName].bytecode;
+            const ABI = output.contracts[modelInfo.entryContractName].interface;
+            console.log('ByteCode : ' + bytecode);
+            console.log('ABI : ' + ABI);
+            
             modelStore.set(modelInfo.name, modelInfo);
             res.status(201).send({ id: modelInfo.name,
                                    name: modelInfo.entryContractName, 
